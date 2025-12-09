@@ -3,16 +3,21 @@
   <head>
     <title>Game Kotak</title>
     <style>
+      body {
+        background-color: #1B3C53;
+        color: white;
+        }
+      
       .game-section {
-    padding: 100px 40px;
-    text-align: center;
+        padding: 100px 40px;
+        text-align: center;
       }
       
       .game-area {
           width: 320px;
           height: 320px;
           margin: 30px auto;
-          background: #111;
+          background: #234C6A;
           border: 2px solid #00eaff;
           border-radius: 15px;
           position: relative;
@@ -30,13 +35,19 @@
       }
       
       .score-board {
-          margin-top: 20px;
+          margin-top: 15px;
           font-size: 22px;
           font-weight: bold;
       }
-      
-      
-    #backBtn {
+
+      .timer {
+          margin-top: 10px;
+          font-size: 20px;
+          color: #ffea00;
+          font-weight: bold;
+      }
+
+      #backBtn {
         position: absolute;
         top: 15px;
         left: 15px;
@@ -50,46 +61,51 @@
         box-shadow: 0 0 10px #00eaff66;
         transition: 0.2s;
         z-index: 10;
-    }
-    
-    #backBtn:hover {
+      }
+      
+      #backBtn:hover {
         transform: scale(1.07);
         background: #00f5ff;
-    }
+      }
     </style>
   </head>
   <body>
+
 <a href="index.html" id="backBtn">⟵ Kembali</a>
-    
-    <section id="game" class="game-section">
-        <h2>Mini Game</h2>
-        <p>Klik kotak yang bergerak untuk mendapatkan skor!</p>
-    
-        <div class="game-area" id="gameArea">
-            <div class="box" id="box"></div>
-        </div>
-    
-        <div class="score-board">
-            Score: <span id="score">0</span>
-        </div>
-    </section>
-    <script>
-      const box = document.getElementById("box");
+
+<section id="game" class="game-section">
+    <h2>Mini Game - 1 Menit</h2>
+    <p>Klik kotak sebanyak mungkin sebelum 60 detik habis!</p>
+
+    <div class="timer">
+        Waktu: <span id="time">60</span>s
+    </div>
+
+    <div class="game-area" id="gameArea">
+        <div class="box" id="box"></div>
+    </div>
+
+    <div class="score-board">
+        Score: <span id="score">0</span>
+    </div>
+</section>
+<script>
+const box = document.getElementById("box");
 const gameArea = document.getElementById("gameArea");
 const scoreDisplay = document.getElementById("score");
+const timeDisplay = document.getElementById("time");
 
 let score = 0;
+let timeLeft = 60;
+let gameOver = false;
 
-// Gerakkan kotak setiap kali diklik
-box.addEventListener("click", () => {
-    score++;
-    scoreDisplay.textContent = score;
+let moveSpeed = 1000; // kecepatan awal (1 detik)
+let autoMove;
 
-    moveBox();
-});
-
-// Fungsi untuk memindahkan box ke posisi acak
+// Pindahkan box ke posisi acak
 function moveBox() {
+    if (gameOver) return;
+
     const areaWidth = gameArea.clientWidth - 50;
     const areaHeight = gameArea.clientHeight - 50;
 
@@ -100,12 +116,50 @@ function moveBox() {
     box.style.top = `${randomY}px`;
 }
 
-// Kotak bergerak tiap 1 detik (auto)
-setInterval(moveBox, 1000);
+// Restart interval autoMove setiap kali kecepatan berubah
+function updateSpeed() {
+    clearInterval(autoMove);
+    autoMove = setInterval(moveBox, moveSpeed);
+}
 
-// Mulai posisi awal
+// Klik box → tambah skor + percepat game
+box.addEventListener("click", () => {
+    if (gameOver) return;
+
+    score++;
+    scoreDisplay.textContent = score;
+
+    // percepat: makin tinggi skor makin cepat
+    moveSpeed = Math.max(200, 1000 - score * 30);  
+    updateSpeed();
+
+    moveBox();
+});
+
+// Timer 60 detik
+const timerInterval = setInterval(() => {
+    if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        clearInterval(autoMove);
+        gameOver = true;
+
+        box.style.display = "none";
+
+        alert("Waktu Habis!\nScore kamu: " + score);
+        return;
+    }
+
+    timeLeft--;
+    timeDisplay.textContent = timeLeft;
+}, 1000);
+
+// Mulai gerakan otomatis awal
+autoMove = setInterval(moveBox, moveSpeed);
+
+// Posisi awal
 moveBox();
+</script>
 
-    </script>
-  </body>
+
+</body>
 </html>
