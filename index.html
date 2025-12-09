@@ -1,61 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Modern Website</title>
-    <link rel="stylesheet" href="style.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Collection</title>
+
+<style>
+    :root{
+        --bg: #0a0f1f;
+        --card: #11182b;
+        --accent: #00eaff;
+        --text: #e9f1ff;
+    }
+
+    body{
+        margin:0;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+    }
+
+    .container{
+        max-width:500px;
+        margin:0 auto;
+        padding:20px;
+    }
+
+    h1{
+        text-align:center;
+        font-size:28px;
+        margin-bottom:25px;
+        color:var(--accent);
+    }
+
+    .game-list{
+        display:flex;
+        flex-direction:column;
+        gap:15px;
+    }
+
+    .card{
+        background:var(--card);
+        padding:18px;
+        border-radius:14px;
+        box-shadow:0 4px 10px rgba(0,0,0,.3);
+        transition:.2s;
+        text-decoration:none;
+        color:var(--text);
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+    }
+
+    .card:hover{
+        transform:scale(1.03);
+        background:#182034;
+    }
+
+    .card span{
+        font-size:18px;
+        font-weight:bold;
+    }
+
+    .arrow{
+        font-size:20px;
+        color:var(--accent);
+    }
+
+    /* Responsif Mobile */
+    @media (max-width:480px){
+        h1{ font-size:22px; }
+        .card span{ font-size:16px; }
+    }
+</style>
+
 </head>
 <body>
 
-    <!-- NAVBAR -->
-    <nav class="navbar">
-        <div class="logo">MyWeb</div>
-        <ul class="nav-links">
-            <li><a href="#home">Home</a></li>
-            <li><a href="#features">Features</a></li>
-            <li><a href="#about">About</a></li>
-            <li><a href="snake-mobile.html">Snake game</a></li>
-            <li><a href="brick-breaker.html">Brick Breaker</a></li>
-            <li><a href="kotak-game.html">Game Kotak</a></li>
-            <li><a href="Dte.html">Game Keren</a></li>
-        </ul>
-        <div class="menu-btn" id="menuBtn">☰</div>
-    </nav>
+<div class="container">
+  
+  
+    <h1>Game Collection</h1>
 
-    <!-- HERO SECTION -->
-    <section id="home" class="hero">
-        <h1 class="hero-title">Website Keren<br><span>Tanpa Framework</span></h1>
-        <p class="hero-desc">Cuma modal HTML, CSS, dan JavaScript.</p>
-        <button class="btn explore-btn">Explore Now</button>
-    </section>
+    <div class="game-list">
+        <a href="dodge.html" class="card">
+            <span>Dodge The Enemy</span>
+            <div class="arrow">›</div>
+        </a>
 
-    <!-- FEATURES -->
-    <section id="features" class="features">
-        <h2>Features</h2>
-        <div class="cards">
-            <div class="card">
-                <h3>Fast</h3>
-                <p>Loading super cepat karena tanpa library berat.</p>
-            </div>
-            <div class="card">
-                <h3>Responsive</h3>
-                <p>Tampilan mantap dari HP sampai desktop.</p>
-            </div>
-            <div class="card">
-                <h3>Modern UI</h3>
-                <p>Clean design + smooth animation bikin nyaman.</p>
-            </div>
-        </div>
-    </section>
+        <a href="brick-breaker.html" class="card">
+            <span>Brick Breaker</span>
+            <div class="arrow">›</div>
+        </a>
 
-    <!-- ABOUT -->
-    <section id="about" class="about">
-        <h2>About This Web</h2>
-        <p>Web ini dibuat hanya dengan HTML, CSS, dan JS, tapi tetap modern, aesthetic, dan profesional.</p>
-    </section>
-    
-    <script src="script.js"></script>
+        <a href="snake-mobile.html" class="card">
+            <span>Snake Mini</span>
+            <div class="arrow">›</div>
+        </a>
+
+        <!-- Bisa tambah game lain -->
+    </div>
+</div>
+
 </body>
 </html>
