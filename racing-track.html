@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Racing Track Mini</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #111;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        user-select: none;
+    }
+
+    #game {
+        width: 360px;
+        height: 600px;
+        background: #2e2e2e;
+        overflow: hidden;
+        position: relative;
+        border-radius: 12px;
+        border: 3px solid #444;
+    }
+
+    .road-line {
+        width: 10px;
+        height: 60px;
+        background: white;
+        position: absolute;
+        left: 175px;
+        top: 0;
+        opacity: 0.8;
+    }
+/* Mobil Player */
+#player {
+    width: 50px;
+    height: 90px;
+    position: absolute;
+    bottom: 20px;
+    left: 155px;
+
+    background: #00b7ff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 10px #00b7ff88;
+}
+
+/* Kaca depan & belakang */
+#player::before {
+    content: "";
+    position: absolute;
+    width: 70%;
+    height: 20px;
+    background: #e6f9ff;
+    top: 10px;
+    left: 15%;
+    border-radius: 4px;
+}
+#player::after {
+    content: "";
+    position: absolute;
+    width: 70%;
+    height: 20px;
+    background: #d0f4ff;
+    bottom: 10px;
+    left: 15%;
+    border-radius: 4px;
+}
+
+/* Mobil Musuh */
+.enemy {
+    width: 50px;
+    height: 90px;
+    position: absolute;
+    top: -100px;
+
+    background: #ff4d4d;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 10px #ff000088;
+}
+
+/* Kaca musuh */
+.enemy::before {
+    content: "";
+    position: absolute;
+    width: 70%;
+    height: 20px;
+    background: #ffdede;
+    top: 10px;
+    left: 15%;
+    border-radius: 4px;
+}
+.enemy::after {
+    content: "";
+    position: absolute;
+    width: 70%;
+    height: 20px;
+    background: #ffcccc;
+    bottom: 10px;
+    left: 15%;
+    border-radius: 4px;
+}
+
+
+    #score {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        color: white;
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    /* ====== MOBILE BUTTONS ====== */
+    #controls {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 120px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: auto;
+    }
+
+    .btn {
+        width: 50%;
+        height: 100%;
+        opacity: 0.2;
+        background: #ffffff20;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 28px;
+        font-weight: bold;
+        color: white;
+        touch-action: none;
+    }
+
+    .btn:active {
+        opacity: 0.4;
+    }
+    
+    #backBtn {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        background: #00eaff;
+        padding: 10px 18px;
+        color: #000;
+        text-decoration: none;
+        font-weight: bold;
+        border-radius: 10px;
+        font-size: 16px;
+        box-shadow: 0 0 10px #00eaff66;
+        transition: 0.2s;
+        z-index: 10;
+    }
+    
+    #backBtn:hover {
+        transform: scale(1.07);
+        background: #00f5ff;
+    }
+</style>
+</head>
+<body>
+<a href="index.html" id="backBtn">⟵ Kembali</a>
+  
+
+<div id="game">
+    <div id="score">Score: 0</div>
+    <div id="player"></div>
+
+    <!-- MOBILE CONTROLS -->
+    <div id="controls">
+        <div class="btn" id="leftBtn">⟵</div>
+        <div class="btn" id="rightBtn">⟶</div>
+    </div>
+</div>
+
+<script>
+const game = document.getElementById("game");
+const player = document.getElementById("player");
+const scoreText = document.getElementById("score");
+
+const leftBtn = document.getElementById("leftBtn");
+const rightBtn = document.getElementById("rightBtn");
+
+let playerX = 155;
+let speedRoad = 5;
+let speedEnemy = 4;
+let enemies = [];
+let roadLines = [];
+let score = 0;
+let gameOver = false;
+
+/* Buat garis jalan */
+for (let i = 0; i < 6; i++) {
+    let line = document.createElement("div");
+    line.classList.add("road-line");
+    line.style.top = (i * 120) + "px";
+    game.appendChild(line);
+    roadLines.push(line);
+}
+
+/* Gerak keyboard */
+document.addEventListener("keydown", e => {
+    if (gameOver) return;
+    if (e.key === "ArrowLeft" && playerX > 20) playerX -= 15;
+    if (e.key === "ArrowRight" && playerX < 290) playerX += 15;
+    player.style.left = playerX + "px";
+});
+
+/* ====== Mobile Buttons Movement ====== */
+let movingLeft = false;
+let movingRight = false;
+
+leftBtn.addEventListener("touchstart", () => movingLeft = true);
+leftBtn.addEventListener("touchend", () => movingLeft = false);
+
+rightBtn.addEventListener("touchstart", () => movingRight = true);
+rightBtn.addEventListener("touchend", () => movingRight = false);
+
+/* Gerak lintasan */
+function moveRoad() {
+    roadLines.forEach(line => {
+        let top = parseInt(line.style.top);
+        top += speedRoad;
+        if (top > 600) top = -120;
+        line.style.top = top + "px";
+    });
+}
+
+/* Buat musuh */
+function spawnEnemy() {
+    if (gameOver) return;
+
+    let enemy = document.createElement("div");
+    enemy.classList.add("enemy");
+    enemy.style.left = (Math.random() * 250 + 30) + "px";
+    game.appendChild(enemy);
+    enemies.push(enemy);
+}
+
+setInterval(spawnEnemy, 1200);
+
+/* Gerak musuh */
+function moveEnemies() {
+    enemies.forEach((enemy, i) => {
+        let top = enemy.offsetTop + speedEnemy;
+        enemy.style.top = top + "px";
+
+        if (top > 650) {
+            enemy.remove();
+            enemies.splice(i, 1);
+            score++;
+            scoreText.textContent = "Score: " + score;
+        }
+
+        checkCollision(enemy);
+    });
+}
+
+/* Cek tabrakan */
+function checkCollision(enemy) {
+    const p = player.getBoundingClientRect();
+    const e = enemy.getBoundingClientRect();
+
+    if (
+        p.left < e.right &&
+        p.right > e.left &&
+        p.top < e.bottom &&
+        p.bottom > e.top
+    ) {
+        endGame();
+    }
+}
+
+/* Game Over */
+function endGame() {
+    gameOver = true;
+    alert("Game Over!\nScore kamu: " + score);
+    location.reload();
+}
+
+/* Update Loop */
+function update() {
+    if (!gameOver) {
+        moveRoad();
+        moveEnemies();
+
+        if (movingLeft && playerX > 20) {
+            playerX -= 4;
+        }
+        if (movingRight && playerX < 290) {
+            playerX += 4;
+        }
+
+        player.style.left = playerX + "px";
+
+        requestAnimationFrame(update);
+    }
+}
+update();
+</script>
+
+</body>
+</html>

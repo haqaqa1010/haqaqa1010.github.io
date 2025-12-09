@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drag Race Mini</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #111;
+        color: white;
+        font-family: Arial;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        user-select: none;
+    }
+
+    #game {
+        width: 350px;
+        text-align: center;
+    }
+
+    #lights {
+        margin-bottom: 25px;
+    }
+
+    .light {
+        width: 45px;
+        height: 45px;
+        background: #333;
+        border-radius: 50%;
+        margin: 8px auto;
+        transition: 0.2s;
+    }
+
+    #track {
+        width: 100%;
+        height: 200px;
+        background: #222;
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    #car {
+        width: 60px;
+        height: 30px;
+        background: red;
+        position: absolute;
+        left: 10px;
+        top: 85px;
+        border-radius: 6px;
+        transition: 0.05s;
+    }
+
+    #gas, #restart {
+        margin-top: 25px;
+        padding: 15px 40px;
+        background: #00c853;
+        border: none;
+        color: white;
+        font-size: 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 0 10px #00c853aa;
+        transition: 0.2s;
+    }
+
+    #gas:active, #restart:active {
+        transform: scale(0.95);
+    }
+
+    #restart {
+        display: none;
+        background: #2962ff;
+        box-shadow: 0 0 10px #2962ffaa;
+    }
+
+    #status {
+        margin-top: 15px;
+        font-size: 20px;
+        min-height: 30px;
+    }
+     
+    #backBtn {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        background: #00eaff;
+        padding: 10px 18px;
+        color: #000;
+        text-decoration: none;
+        font-weight: bold;
+        border-radius: 10px;
+        font-size: 16px;
+        box-shadow: 0 0 10px #00eaff66;
+        transition: 0.2s;
+        z-index: 10;
+    }
+    
+    #backBtn:hover {
+        transform: scale(1.07);
+        background: #00f5ff;
+    }
+</style>
+</head>
+<body>
+  <a href="index.html" id="backBtn">⟵ Kembali</a>
+
+
+<div id="game">
+
+    <!-- Lampu -->
+    <div id="lights">
+        <div id="l1" class="light"></div>
+        <div id="l2" class="light"></div>
+        <div id="l3" class="light"></div>
+        <div id="green" class="light"></div>
+    </div>
+
+    <!-- Track -->
+    <div id="track">
+        <div id="car"></div>
+    </div>
+
+    <!-- Tombol -->
+    <button id="gas">GAS!</button>
+    <button id="restart">Restart</button>
+
+    <div id="status"></div>
+
+</div>
+
+<script>
+let ready = false;
+let startTime = 0;
+let finished = false;
+
+const lights = ["l1", "l2", "l3"];
+const greenLight = document.getElementById("green");
+const gasBtn = document.getElementById("gas");
+const restartBtn = document.getElementById("restart");
+const statusText = document.getElementById("status");
+const car = document.getElementById("car");
+
+// Random delay untuk lampu hijau
+const delay = Math.floor(Math.random() * 2000) + 2000;
+
+function startLights() {
+    let i = 0;
+
+    function nextLight() {
+        if (i < lights.length) {
+            document.getElementById(lights[i]).style.background = "orange";
+            i++;
+            setTimeout(nextLight, 700);
+        } else {
+            setTimeout(() => {
+                greenLight.style.background = "lime";
+                ready = true;
+                startTime = performance.now();
+            }, delay);
+        }
+    }
+
+    nextLight();
+}
+
+startLights();
+
+gasBtn.onclick = () => {
+    if (finished) return;
+
+    // False start
+    if (!ready) {
+        finished = true;
+        statusText.textContent = "🚫 False Start! Kamu terlalu cepat!";
+        statusText.style.color = "red";
+        showRestart();
+        return;
+    }
+
+    // Hitung reaksi
+    const reaction = performance.now() - startTime;
+
+    statusText.textContent = "Reaksi: " + reaction.toFixed(0) + " ms";
+    statusText.style.color = "#00e676";
+
+    // Gerak mobil berdasarkan reaksi
+    let distance = 10;
+    const speed = Math.max(3, 15 - reaction / 80); 
+
+    const move = setInterval(() => {
+        distance += speed;
+        car.style.left = distance + "px";
+
+        if (distance >= 270) {
+            clearInterval(move);
+            finished = true;
+            statusText.textContent += " — 🏁 Finish!";
+            showRestart();
+        }
+    }, 30);
+};
+
+function showRestart() {
+    restartBtn.style.display = "inline-block";
+    gasBtn.style.display = "none";
+}
+
+restartBtn.onclick = () => {
+    location.reload();
+};
+</script>
+
+</body>
+</html>
