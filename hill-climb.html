@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Hill Climb Mini</title>
+<style>
+  :root{
+    --bg:#8ecae6;
+    --ground:#6b705c;
+    --track:#a7c957;
+    --car:#ef476f;
+    --accent:#ffd166;
+    --panel: rgba(10,10,10,0.6);
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+  html,body{height:100%;margin:0;background:linear-gradient(#bfe9f8,var(--bg));display:flex;align-items:center;justify-content:center;padding:12px}
+  .wrap{width:360px;max-width:96vw;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(0,0,0,0.02));box-shadow:0 10px 30px rgba(2,6,23,0.3)}
+  header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel);color:#fff}
+  header h1{font-size:16px;margin:0}
+  .hud{display:flex;gap:10px;align-items:center}
+  .chip{background:rgba(255,255,255,0.06);padding:6px 8px;border-radius:8px;font-size:13px}
+  #game{width:100%;height:600px;background:linear-gradient(#87d6e8,#6ab1d9);position:relative;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  .controls{display:flex;gap:8px;padding:10px;justify-content:center;background:#0b1220;color:#fff}
+  .btn{padding:10px 12px;border-radius:8px;border:none;background:#1f6f8b;color:#fff;font-weight:700;cursor:pointer}
+  .btn:active{transform:scale(0.98)}
+  .big{padding:14px 18px;font-size:16px}
+  .mobile-controls{display:flex;gap:10px;justify-content:center;padding:8px}
+  .touch-btn{width:72px;height:56px;border-radius:10px;background:rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px}
+  footer{font-size:13px;padding:8px;text-align:center;color:#022b3a;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
+  @media (min-width:720px){ .wrap{width:720px} #game{height:520px} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Hill Climb — Mini</h1>
+      <div class="hud">
+        <div class="chip">Dist: <span id="dist">0</span> m</div>
+        <div class="chip">Speed: <span id="spd">0</span> km/h</div>
+      </div>
+    </header>
+
+    <div id="game" aria-label="Hill Climb Game">
+      <canvas id="c"></canvas>
+      <!-- overlays handled by JS -->
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btnRestart">Restart</button>
+      <button class="btn" id="btnBrake">Brake</button>
+      <button class="btn" id="btnGas">Gas</button>
+    </div>
+
+    <div class="mobile-controls" style="padding-bottom:12px">
+      <div class="touch-btn" id="touch-left">◀</div>
+      <div class="touch-btn" id="touch-gas">▲</div>
+      <div class="touch-btn" id="touch-right">▶</div>
+    </div>
+
+    <footer>Controls: Keyboard ← → for tilt, ↑ gas, ↓ brake. Mobile: use touch buttons. Don't flip the car!</footer>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // Responsive canvas sizing
+  function fit(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * devicePixelRatio);
+    canvas.height = Math.floor(rect.height * devicePixelRatio);
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  }
+  // set canvas size to parent
+  function setCanvasSize(){
+    const parent = canvas.parentElement;
+    canvas.style.width = parent.clientWidth + 'px';
+    canvas.style.height = parent.clientHeight + 'px';
+    fit();
+  }
+  setCanvasSize();
+  new ResizeObserver(setCanvasSize).observe(canvas.parentElement);
+
+  // UI elems
+  const distEl = document.getElementById('dist');
+  const spdEl = document.getElementById('spd');
+  const btnGas = document.getElementById('btnGas');
+  const btnBrake = document.getElementById('btnBrake');
+  const btnRestart = document.getElementById('btnRestart');
+
+  // Game constants
+  const GRAV = 0.6;          // gravity
+  const FRICTION = 0.995;    // ground friction
+  const ENGINE = 0.14;       // engine power (acceleration)
+  const BRAKE = 0.35;        // braking deceleration
+  const MAX_SPEED = 6.8;     // max forward speed (pixels/frame)
+  const MAX_BACK = 3.2;      // max backward speed
+  const CAR_W = 60;
+  const CAR_H = 30;
+
+  // Terrain generation (procedural using combined sine waves)
+  const SEGMENT = 6; // horizontal sampling in px
+  let terrain = []; // array of y heights
+  let terrainOffset = 0; // how far we've scrolled (px)
+
+  function generateTerrain(lengthPx){
+    // create heights using layered sin + random bumps
+    const points = Math.ceil(lengthPx / SEGMENT);
+    const arr = new Float32Array(points);
+    for(let i=0;i<points;i++){
+      const x = i * SEGMENT;
+      // base sine
+      let y = Math.sin(x * 0.003)*40 + Math.sin(x * 0.01)*24 + Math.sin(x * 0.02)*12;
+      // random bumps
+      y += (Math.sin(x * 0.007 + 1.3) * 10);
+      // slowly increasing roughness over distance
+      y += Math.min(0.0008*x, 200) * Math.sin(x*0.0004)*0.6;
+      arr[i] = y;
+    }
+    return arr;
+  }
+
+  // create initial terrain long enough
+  terrain = generateTerrain(20000); // 20k px => long run
+
+  // Car state (position relative to world)
+  let car = {
+    x: 160,               // screen x (fixed), car is horizontally centered-ish
+    worldX: 80,           // world coordinate (px)
+    y: 0,                 // will be set to terrain
+    vx: 0,                // horizontal velocity in px/frame (positive forward)
+    vy: 0,                // vertical velocity (for jumps/falls)
+    angle: 0,             // tilt angle (radians)
+    rpm: 0,
+    flipped: false
+  };
+
+  // Input
+  let pressingGas = false;
+  let pressingBrake = false;
+  let tiltLeft = false;
+  let tiltRight = false;
+
+  // Game state
+  let running = true;
+  let last = performance.now();
+  let distanceMeters = 0;
+  let travelled = 0; // px
+  let frame = 0;
+
+  // Helpers
+  function terrainHeightAt(worldX){
+    const idx = Math.floor(worldX / SEGMENT);
+    const frac = (worldX % SEGMENT) / SEGMENT;
+    const a = terrain[idx] || 0;
+    const b = terrain[idx+1] || a;
+    return (a + (b-a)*frac);
+  }
+
+  function terrainSlopeAt(worldX){
+    const a = terrainHeightAt(worldX - 1);
+    const b = terrainHeightAt(worldX + 1);
+    return (b - a) / 2; // approximate derivative (px per px)
+  }
+
+  // Reset / init
+  function reset(){
+    car.worldX = 80;
+    car.vx = 0;
+    car.vy = 0;
+    car.angle = 0;
+    car.flipped = false;
+    terrainOffset = 0;
+    distanceMeters = 0;
+    travelled = 0;
+    running = true;
+  }
+  reset();
+
+  // Controls
+  window.addEventListener('keydown', e=>{
+    if(e.code === 'ArrowUp' || e.key === 'w') pressingGas = true;
+    if(e.code === 'ArrowDown' || e.key === 's') pressingBrake = true;
+    if(e.code === 'ArrowLeft' || e.key === 'a') tiltLeft = true;
+    if(e.code === 'ArrowRight' || e.key === 'd') tiltRight = true;
+    if(e.key === 'r' || e.key === 'R') reset();
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.code === 'ArrowUp' || e.key === 'w') pressingGas = false;
+    if(e.code === 'ArrowDown' || e.key === 's') pressingBrake = false;
+    if(e.code === 'ArrowLeft' || e.key === 'a') tiltLeft = false;
+    if(e.code === 'ArrowRight' || e.key === 'd') tiltRight = false;
+  });
+
+  // Buttons
+  btnGas.addEventListener('pointerdown', ()=> pressingGas = true);
+  btnGas.addEventListener('pointerup', ()=> pressingGas = false);
+  btnBrake.addEventListener('pointerdown', ()=> pressingBrake = true);
+  btnBrake.addEventListener('pointerup', ()=> pressingBrake = false);
+  btnRestart.addEventListener('click', ()=> reset());
+
+  // Mobile touch controls
+  document.getElementById('touch-left').addEventListener('pointerdown', ()=> tiltLeft = true);
+  document.getElementById('touch-left').addEventListener('pointerup', ()=> tiltLeft = false);
+  document.getElementById('touch-right').addEventListener('pointerdown', ()=> tiltRight = true);
+  document.getElementById('touch-right').addEventListener('pointerup', ()=> tiltRight = false);
+  document.getElementById('touch-gas').addEventListener('pointerdown', ()=> pressingGas = true);
+  document.getElementById('touch-gas').addEventListener('pointerup', ()=> pressingGas = false);
+
+  // Main update
+  function update(dt){
+    if(!running) return;
+    frame++;
+    // Controls -> acceleration
+    if(pressingGas){
+      car.vx += ENGINE * (1 + Math.abs(terrainSlopeAt(car.worldX))*0.8);
+    } else {
+      // natural engine drag
+      car.vx *= 0.998;
+    }
+    if(pressingBrake){
+      car.vx -= BRAKE;
+    }
+
+    // clamp speeds
+    if(car.vx > MAX_SPEED) car.vx = MAX_SPEED;
+    if(car.vx < -MAX_BACK) car.vx = -MAX_BACK;
+
+    // world movement
+    car.worldX += car.vx;
+    travelled += Math.abs(car.vx);
+
+    // vertical physics: align to terrain
+    const groundY = terrainHeightAt(car.worldX) + (canvas.height/devicePixelRatio)*0.5 + 140; // vertical offset for visual
+    // calculate slope and set angle to match slope (interpolate smooth)
+    const slope = terrainSlopeAt(car.worldX);
+    // set desired angle based on slope; allow manual tilt adjustments for flips
+    const targetAngle = Math.atan(slope);
+    // player tilt slightly modifies angle for flips/tricks
+    if(tiltLeft) car.angle -= 0.03;
+    if(tiltRight) car.angle += 0.03;
+    // gently move rotation toward target when on ground
+    car.angle = car.angle * 0.96 + targetAngle * 0.04;
+
+    // vertical position follows ground (simple hugging)
+    car.y = groundY - CAR_H - Math.max(0, -car.vy); // simpler hugging
+
+    // detect if car "airborne": if slope changes sharply and velocity high, allow small jump
+    // estimate next ground y
+    const nextGround = terrainHeightAt(car.worldX + car.vx*6) + (canvas.height/devicePixelRatio)*0.5 + 140;
+    const delta = nextGround - groundY;
+    if(delta < -8 && car.vx > 2.2){
+      // small launch
+      car.vy = -4 - Math.abs(delta)*0.08;
+    }
+
+    // vertical velocity gravity
+    car.vy += GRAV;
+    // apply vy to y to make it float above ground
+    car.y += car.vy;
+    // landing
+    if(car.y >= groundY - CAR_H){
+      // landed
+      car.y = groundY - CAR_H;
+      if(car.vy > 4){ // heavy landing
+        car.vx *= 0.85;
+      }
+      car.vy = 0;
+    }
+
+    // rotation normalization (if rotated too much -> flip)
+    if(car.angle > Math.PI*0.9 || car.angle < -Math.PI*0.9){
+      running = false;
+      car.flipped = true;
+    }
+
+    // friction on ground
+    if(Math.abs(car.vx) > 0.001 && Math.abs(car.vy) < 0.5) car.vx *= FRICTION;
+
+    // update distance in meters (approx)
+    distanceMeters = Math.floor(travelled * 0.08); // scale px -> meters
+    distEl.textContent = distanceMeters;
+    spdEl.textContent = Math.max(0, Math.floor(car.vx * 12)); // rough km/h-ish
+
+    // end condition: if worldX beyond terrain end => regenerate more terrain
+    const needPx = Math.max(800, (canvas.width/devicePixelRatio)*2);
+    if(car.worldX + needPx > terrain.length * SEGMENT){
+      // append more terrain by generating extra and concatenating
+      const extra = generateTerrain(12000);
+      const newArr = new Float32Array(terrain.length + extra.length);
+      newArr.set(terrain,0);
+      newArr.set(extra, terrain.length);
+      terrain = newArr;
+    }
+  }
+
+  // Drawing
+  function draw(){
+    const W = canvas.width / devicePixelRatio;
+    const H = canvas.height / devicePixelRatio;
+    // clear sky
+    ctx.fillStyle = '#87d6e8';
+    ctx.fillRect(0,0,W,H);
+
+    // center baseline for terrain
+    const baseY = H*0.5 + 140;
+
+    // draw terrain: sample around car.worldX and shift by terrainOffset to keep car near center
+    const centerScreenX = car.x;
+    const startWorldX = Math.max(0, car.worldX - centerScreenX - 120);
+    const endWorldX = car.worldX + (W - centerScreenX) + 120;
+    const startIdx = Math.floor(startWorldX / SEGMENT);
+    const endIdx = Math.ceil(endWorldX / SEGMENT);
+
+    // sky gradient + sun
+    ctx.fillStyle = '#f6e7a1';
+    ctx.beginPath();
+    ctx.ellipse(W - 60, 70, 40, 40, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // draw ground fill
+    ctx.beginPath();
+    for(let i = startIdx; i <= endIdx; i++){
+      const wx = i * SEGMENT;
+      const sx = Math.round(centerScreenX + (wx - car.worldX));
+      const sy = baseY + terrain[i] || baseY;
+      if(i === startIdx) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    }
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fillStyle = '#5b6b51'; // darker ground under
+    ctx.fill();
+
+    // draw grassy top stroke
+    ctx.beginPath();
+    for(let i = startIdx; i <= endIdx; i++){
+      const wx = i * SEGMENT;
+      const sx = Math.round(centerScreenX + (wx - car.worldX));
+      const sy = baseY + terrain[i] || baseY;
+      if(i === startIdx) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    }
+    ctx.strokeStyle = '#7aa44f';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // draw some decorative rocks/tiles
+    for(let i = startIdx; i <= endIdx; i+=20){
+      const wx = i * SEGMENT;
+      const sx = Math.round(centerScreenX + (wx - car.worldX));
+      const sy = baseY + terrain[i] || baseY;
+      if((i % 40) === 0){
+        ctx.fillStyle = '#4b3e2a';
+        ctx.fillRect(sx - 6, sy - 6, 12, 6);
+      }
+    }
+
+    // draw car with rotation
+    ctx.save();
+    ctx.translate(car.x + CAR_W/2, car.y + CAR_H/2);
+    ctx.rotate(car.angle);
+    // car body
+    ctx.fillStyle = '#ef476f';
+    roundRect(ctx, -CAR_W/2, -CAR_H/2, CAR_W, CAR_H, 6);
+    ctx.fill();
+    // window
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(-CAR_W/4, -CAR_H/6, CAR_W/2, CAR_H/4);
+    // wheels
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-CAR_W/2 + 6, CAR_H/2 - 6, 14, 8);
+    ctx.fillRect(CAR_W/2 - 20, CAR_H/2 - 6, 14, 8);
+    ctx.restore();
+
+    // overlay status if flipped
+    if(!running && car.flipped){
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#fff';
+      ctx.font = '20px Inter, Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('YOU FLIPPED! — Game Over', W/2, H/2 - 10);
+      ctx.font = '14px Inter, Arial';
+      ctx.fillText('Tekan Restart untuk coba lagi', W/2, H/2 + 18);
+    }
+  }
+
+  // util roundRect
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  // loop
+  function loop(now){
+    const dt = Math.min(40, now - last);
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // pointer drag to tilt car (optional)
+  let dragging = false;
+  let lastPointerX = 0;
+  canvas.addEventListener('pointerdown', (e)=> { dragging = true; lastPointerX = e.clientX; });
+  canvas.addEventListener('pointermove', (e)=> {
+    if(!dragging) return;
+    const dx = e.clientX - lastPointerX;
+    lastPointerX = e.clientX;
+    car.angle += dx * 0.002;
+  });
+  canvas.addEventListener('pointerup', ()=> dragging = false);
+  canvas.addEventListener('pointercancel', ()=> dragging = false);
+
+  // simple taps for gas on canvas
+  canvas.addEventListener('pointerdown', (e)=>{
+    // if tap lower half -> gas
+    const rect = canvas.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if(y > rect.height * 0.55) { pressingGas = true; setTimeout(()=> pressingGas = false, 120); }
+  });
+
+})();
+</script>
+</body>
+</html>
